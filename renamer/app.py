@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # renamer/app.py
 
-"""This module provides the FilesRenamer application."""
+"""This module provides the FileRenamer application."""
 
 
 import sys

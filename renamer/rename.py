@@ -27,7 +27,7 @@ class Renamer(QObject):
                 f"{self._prefix}{str(fileNumber)}{file.suffix}"
             )
             file.rename(newFile)
-            time.sleep(0.1)
+            time.sleep(0.02)
             self.progressed.emit(fileNumber)
             self.renamedFile.emit(newFile)
         self.progressed.emit(0)

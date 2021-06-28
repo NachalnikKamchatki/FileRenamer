@@ -6,6 +6,7 @@
 from collections import deque
 from pathlib import Path
 from renamer.rename import Renamer
+from cleaner.clean import Cleaner
 
 
 from PyQt5.QtWidgets import QFileDialog, QWidget
@@ -13,18 +14,7 @@ from PyQt5.QtCore import QThread
 
 from .ui.window import Ui_Window
 
-
-FILTERS = ";;".join(
-    (
-        "PNG Files (*.png)",
-        "JPG Files (*.jpg)",
-        "JPEG Files (*.jpeg)",
-        "GIF Files (*.gif)",
-        "TEXT Files (*.txt)",
-        "Python Files (*.py)",
-        "MSWord files (*.doc, *.docx)",
-    )
-)
+from config import FILTERS
 
 
 class Window(QWidget, Ui_Window):
@@ -41,14 +31,17 @@ class Window(QWidget, Ui_Window):
 
     def _connectSignalsSlots(self):
         self.loadFilesButton.clicked.connect(self.loadFiles)
+        self.clearInfoButton.clicked.connect(self.clearFilesInfo)
         self.renameFilesButton.clicked.connect(self.renameFiles)
         self.prefixEdit.textChanged.connect(self._updateStateWhenReady)
 
     def _updateStateWhenReady(self):
         if self.prefixEdit.text():
             self.renameFilesButton.setEnabled(True)
+            self.clearInfoButton.setEnabled(True)
         else:
             self.renameFilesButton.setEnabled(False)
+            self.clearInfoButton.setEnabled(True)
 
     def loadFiles(self):
         self.dstFileList.clear()
@@ -73,17 +66,23 @@ class Window(QWidget, Ui_Window):
             self._files_count = len(self._files)
             self._updateStateWhenFilesLoaded()
 
+    def clearFilesInfo(self):
+        self._runCleanerThread()
+        self._updateStateWhileProcessing()
+
     def _updateStateWhenFilesLoaded(self):
         self.prefixEdit.setEnabled(True)
         self.prefixEdit.setFocus(True)
+        self.clearInfoButton.setEnabled(True)
 
     def renameFiles(self):
         self._runRenamerThread()
-        self._updateStateWhileRenaming()
+        self._updateStateWhileProcessing()
 
-    def _updateStateWhileRenaming(self):
+    def _updateStateWhileProcessing(self):
         self.loadFilesButton.setEnabled(False)
         self.renameFilesButton.setEnabled(False)
+        self.clearInfoButton.setEnabled(False)
 
     def _runRenamerThread(self):
         prefix = self.prefixEdit.text()
@@ -96,7 +95,7 @@ class Window(QWidget, Ui_Window):
         # Rename
         self._thread.started.connect(self._renamer.renameFiles)
         # Update state
-        self._renamer.renamedFile.connect(self._updateStateWhenFileRenamed)
+        self._renamer.renamedFile.connect(self._updateStateWhenFileProcessed)
         self._renamer.progressed.connect(self._updateProgressBar)
         self._renamer.finished.connect(self._updateStateWhenNoFiles)
         # CleanUp
@@ -106,7 +105,26 @@ class Window(QWidget, Ui_Window):
         # Run the thread
         self._thread.start()
 
-    def _updateStateWhenFileRenamed(self, newFile):
+    def _runCleanerThread(self):
+        self._thread = QThread()
+        self._cleaner = Cleaner(
+            files=tuple(self._files)
+        )
+        self._cleaner.moveToThread(self._thread)
+        # Clean
+        self._thread.started.connect(self._cleaner.clearFilesInfo)
+        # Update state
+        self._cleaner.cleanedFile.connect(self._updateStateWhenFileProcessed)
+        self._cleaner.progressed.connect(self._updateProgressBar)
+        self._cleaner.finished.connect(self._updateStateWhenNoFiles)
+        # CleanUp
+        self._cleaner.finished.connect(self._thread.quit)
+        self._cleaner.finished.connect(self._cleaner.deleteLater)
+        self._thread.finished.connect(self._thread.deleteLater)
+        # Run the thread
+        self._thread.start()
+
+    def _updateStateWhenFileProcessed(self, newFile):
         self._files.popleft()
         self.srcFileList.takeItem(0)
         self.dstFileList.addItem(str(newFile))
@@ -120,5 +138,6 @@ class Window(QWidget, Ui_Window):
         self.loadFilesButton.setEnabled(True)
         self.loadFilesButton.setFocus(True)
         self.renameFilesButton.setEnabled(False)
+        self.clearInfoButton.setEnabled(False)
         self.prefixEdit.clear()
         self.prefixEdit.setEnabled(False)
