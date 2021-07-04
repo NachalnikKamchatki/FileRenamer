@@ -5,6 +5,8 @@
 
 import time
 from pathlib import Path
+import os
+# from docx import Document
 
 
 from PyQt5.QtCore import QObject, pyqtSignal
@@ -22,47 +24,47 @@ class Cleaner(QObject):
         super().__init__()
         self._files = files
 
+    def cleanMSDocMetadata(name):
+        if os.path.exists(name):
+            doc = Document(name)
+
+            coreprops.author           = '1'
+            coreprops.comments         = '1'
+            coreprops.identifier       = '1'
+            coreprops.subject          = '1'
+            coreprops.title            = '1'
+
+            doc.save(name)
+            status = f'{name} metadata succesfully cleared'
+        else:
+            status = f'File {name} not exist'
+        print(status)
+
     def clearFilesInfo(self):
         for fileNumber, file in enumerate(self._files, 1):
-            exif_image = exif.Image(file)
-            if exif_image.has_exif:
-                print(dir(exif_image))
-                # exif_image.delete_all()
-                # status = 'exif data succesfully cleared'
+            # if file.endswith('.docx'):
+            #     cleanMSDocMetadata(name=file)
+            #     continue
 
-                # with open(file, 'wb') as upd_file:
-                #     upd_file.write(exif_image.get_file())
+            try:
+                exif_image = exif.Image(file)
+            except:
+                status = 'Format not supported'
+                exif_image = None
 
-                # status = f"""
+            if exif_image and exif_image.has_exif:
+                # print(dir(exif_image))
+                exif_image.delete_all()
 
-                # ----------------------------
+                with open(file, 'wb') as upd_file:
+                    upd_file.write(exif_image.get_file())
 
-                # Device Information - Image {fileNumber}
-                # Make: {exif_image.get('make', 'unknown')}
-                # Model: {exif_image.get('model', 'unknown')}
+                status = 'exif data succesfully cleared'
 
-                # ---------------------
-
-                # Lens and OS
-                # Lens make: {exif_image.get('lens_make', 'Unknown')}
-                # Lens model: {exif_image.get('lens_model', 'Unknown')}
-                # Lens specification: {exif_image.get('lens_specification', 'Unknown')}
-                # OS version: {exif_image.get('software', 'Unknown')}
-
-                # ---------------------
-
-                # Date/time taken
-                # {exif_image.get('datetime_original', 'unknown')}.{exif_image.get('subsec_time_original', 'unknown')} {exif_image.get('offset_time', '')}
-
-                # ---------------------
-
-                # Coordinates
-                # Latitude: {exif_image.get('gps_latitude', 'unknown')} {exif_image.get('gps_latitude_ref', 'unknown')}
-                # Longitude: {exif_image.get('gps_longitude', 'unknown')} {exif_image.get('gps_longitude_ref', 'unknown')}"""
             else:
                 status = "does not contain any EXIF information."
 
-            print(f"Image {fileNumber} {status}")
+            print(f"Image {file} {status}")
             time.sleep(0.02)
             self.progressed.emit(fileNumber)
             self.cleanedFile.emit(file)
